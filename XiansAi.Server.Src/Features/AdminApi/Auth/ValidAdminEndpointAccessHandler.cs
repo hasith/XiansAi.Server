@@ -134,7 +134,9 @@ public sealed class ValidAdminEndpointAccessHandler : AuthorizationHandler<Valid
 
     private string? ResolveAccessToken(HttpContext? httpContext)
     {
-        if (!string.IsNullOrEmpty(_tenantContext.Authorization))
+        // Always extract from request headers to prevent TOCTOU attacks
+        return AdminApiAuthHelpers.ExtractBearerToken(httpContext?.Request);
+    }
         {
             return _tenantContext.Authorization;
         }
