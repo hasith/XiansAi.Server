@@ -89,7 +89,7 @@ internal static class AdminApiAuthHelpers
         tenantContext.LoggedInUser = userId;
         tenantContext.UserType = UserType.UserApiKey;
         tenantContext.TenantId = finalTenantId;
-        tenantContext.UserRoles = userRoles;
+        tenantContext.UserRoles = userRoles.ToArray();
         tenantContext.AuthorizedTenantIds = [finalTenantId];
         tenantContext.Authorization = accessToken;
     }

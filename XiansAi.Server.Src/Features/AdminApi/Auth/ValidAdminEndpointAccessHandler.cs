@@ -37,6 +37,13 @@ public sealed class ValidAdminEndpointAccessHandler : AuthorizationHandler<Valid
         AuthorizationHandlerContext context,
         ValidAdminEndpointAccessRequirement requirement)
     {
+        if (_tenantContext is null)
+        {
+            _logger.LogError("Failed to resolve ITenantContext from request scope");
+            context.Fail();
+            return;
+        }
+
         var loggedInUser = context.User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
         if (string.IsNullOrEmpty(loggedInUser))
         {
