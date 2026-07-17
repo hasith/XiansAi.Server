@@ -168,7 +168,7 @@ public class ActivationValidationService : IActivationValidationService
                     StatusCode.BadRequest);
             }
 
-            var workflowConfig = activation.WorkflowConfiguration?.Workflows
+            var workflowConfig = activation.WorkflowConfiguration?.Workflows?
                 .FirstOrDefault(w => w.WorkflowType == workflowType);
             if (workflowConfig == null)
             {
@@ -179,9 +179,9 @@ public class ActivationValidationService : IActivationValidationService
                 return ServiceResult<object[]>.Success(Array.Empty<object>());
             }
 
-            var inputValues = workflowConfig.Inputs
+            var inputValues = workflowConfig.Inputs?
                 .Select(input => (object)input.Value)
-                .ToArray();
+                .ToArray() ?? Array.Empty<object>();
 
             _logger.LogInformation(
                 "Returning {Count} workflow input(s) for workflowType={WorkflowType}, workflowId={WorkflowId}, activationName={ActivationName}",
