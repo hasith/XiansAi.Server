@@ -27,6 +27,16 @@ public interface IActivationValidationService
     /// Call when an activation is deactivated or deleted to ensure subsequent requests fail immediately.
     /// </summary>
     void InvalidateActivationCache(string tenantId, string agentName, string activationName);
+
+    /// <summary>
+    /// Returns the ordered workflow input values configured for an active activation and workflow type.
+    /// </summary>
+    Task<ServiceResult<object[]>> GetWorkflowInputsAsync(
+        string tenantId,
+        string agentName,
+        string activationName,
+        string workflowType,
+        string workflowId);
 }
 
 public class ActivationValidationService : IActivationValidationService
@@ -98,6 +108,109 @@ public class ActivationValidationService : IActivationValidationService
     public void InvalidateActivationCache(string tenantId, string agentName, string activationName)
     {
         _cache.Remove(BuildCacheKey(tenantId, agentName, activationName));
+    }
+
+    public async Task<ServiceResult<object[]>> GetWorkflowInputsAsync(
+        string tenantId,
+        string agentName,
+        string activationName,
+        string workflowType,
+        string workflowId)
+    {
+        if (string.IsNullOrWhiteSpace(tenantId))
+        {
+            _logger.LogWarning("TenantId could not be resolved from certificate context");
+            return ServiceResult<object[]>.Failure("TenantId could not be resolved", StatusCode.BadRequest);
+        }
+        if (string.IsNullOrWhiteSpace(agentName))
+            return ServiceResult<object[]>.Failure("AgentName is required", StatusCode.BadRequest);
+        if (string.IsNullOrWhiteSpace(activationName))
+            return ServiceResult<object[]>.Failure("ActivationName is required", StatusCode.BadRequest);
+        if (string.IsNullOrWhiteSpace(workflowType))
+            return ServiceResult<object[]>.Failure("WorkflowType is required", StatusCode.BadRequest);
+        if (string.IsNullOrWhiteSpace(workflowId))
+            return ServiceResult<object[]>.Failure("WorkflowId is required", StatusCode.BadRequest);
+
+        _logger.LogInformation(
+            "Retrieving workflow inputs: activationName={ActivationName}, agentName={AgentName}, workflowType={WorkflowType}, workflowId={WorkflowId}, tenantId={TenantId}",
+            LogSanitizer.Sanitize(activationName),
+            LogSanitizer.Sanitize(agentName),
+            LogSanitizer.Sanitize(workflowType),
+            LogSanitizer.Sanitize(workflowId),
+            LogSanitizer.Sanitize(tenantId));
+
+        try
+        {
+            var activation = await _activationRepository.GetByNameAndAgentAsync(tenantId, agentName, activationName);
+            if (activation == null)
+            {
+                _logger.LogWarning(
+                    "Activation not found: activationName={ActivationName}, agentName={AgentName}, tenantId={TenantId}",
+                    LogSanitizer.Sanitize(activationName),
+                    LogSanitizer.Sanitize(agentName),
+                    LogSanitizer.Sanitize(tenantId));
+                return ServiceResult<object[]>.NotFound(
+                    $"Activation '{activationName}' not found for agent '{agentName}'");
+            }
+
+            if (!activation.IsActive)
+            {
+                _logger.LogWarning(
+                    "Activation '{ActivationName}' for agent '{AgentName}' in tenant '{TenantId}' is not active",
+                    LogSanitizer.Sanitize(activationName),
+                    LogSanitizer.Sanitize(agentName),
+                    LogSanitizer.Sanitize(tenantId));
+                return ServiceResult<object[]>.Failure(
+                    $"Activation '{activationName}' is not active",
+                    StatusCode.BadRequest);
+            }
+
+            if (!activation.WorkflowIds.Contains(workflowId))
+            {
+                _logger.LogWarning(
+                    "WorkflowId '{WorkflowId}' is not registered in activation '{ActivationName}'",
+                    LogSanitizer.Sanitize(workflowId),
+                    LogSanitizer.Sanitize(activationName));
+                return ServiceResult<object[]>.Failure(
+                    $"WorkflowId '{workflowId}' is not registered in activation '{activationName}'",
+                    StatusCode.BadRequest);
+            }
+
+            var workflowConfig = activation.WorkflowConfiguration?.Workflows?
+                .FirstOrDefault(w => w.WorkflowType == workflowType);
+            if (workflowConfig == null)
+            {
+                _logger.LogWarning(
+                    "WorkflowType '{WorkflowType}' not found in activation '{ActivationName}'",
+                    LogSanitizer.Sanitize(workflowType),
+                    LogSanitizer.Sanitize(activationName));
+                return ServiceResult<object[]>.Success(Array.Empty<object>());
+            }
+
+            var inputValues = workflowConfig.Inputs?
+                .Select(input => (object)input.Value)
+                .ToArray() ?? Array.Empty<object>();
+
+            _logger.LogInformation(
+                "Returning {Count} workflow input(s) for workflowType={WorkflowType}, workflowId={WorkflowId}, activationName={ActivationName}",
+                inputValues.Length,
+                LogSanitizer.Sanitize(workflowType),
+                LogSanitizer.Sanitize(workflowId),
+                LogSanitizer.Sanitize(activationName));
+
+            return ServiceResult<object[]>.Success(inputValues);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(
+                ex,
+                "Error retrieving workflow inputs for activation '{ActivationName}', agent '{AgentName}', tenant {TenantId}",
+                LogSanitizer.Sanitize(activationName),
+                LogSanitizer.Sanitize(agentName),
+                LogSanitizer.Sanitize(tenantId));
+            return ServiceResult<object[]>.InternalServerError(
+                "An error occurred while retrieving workflow inputs");
+        }
     }
 
     private static string BuildCacheKey(string tenantId, string agentName, string activationName)
