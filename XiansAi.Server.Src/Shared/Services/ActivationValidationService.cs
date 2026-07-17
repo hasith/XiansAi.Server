@@ -122,6 +122,14 @@ public class ActivationValidationService : IActivationValidationService
             _logger.LogWarning("TenantId could not be resolved from certificate context");
             return ServiceResult<object[]>.Failure("TenantId could not be resolved", StatusCode.BadRequest);
         }
+        if (string.IsNullOrWhiteSpace(agentName))
+            return ServiceResult<object[]>.Failure("AgentName is required", StatusCode.BadRequest);
+        if (string.IsNullOrWhiteSpace(activationName))
+            return ServiceResult<object[]>.Failure("ActivationName is required", StatusCode.BadRequest);
+        if (string.IsNullOrWhiteSpace(workflowType))
+            return ServiceResult<object[]>.Failure("WorkflowType is required", StatusCode.BadRequest);
+        if (string.IsNullOrWhiteSpace(workflowId))
+            return ServiceResult<object[]>.Failure("WorkflowId is required", StatusCode.BadRequest);
 
         _logger.LogInformation(
             "Retrieving workflow inputs: activationName={ActivationName}, agentName={AgentName}, workflowType={WorkflowType}, workflowId={WorkflowId}, tenantId={TenantId}",
