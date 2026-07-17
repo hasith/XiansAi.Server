@@ -176,3 +176,5 @@ All path construction is handled by `AdminApiConstants`, so there are no hardcod
 
 
 
+
+<!-- pr-reviewer validation marker 2026-07-17T02:50:46Z -->
